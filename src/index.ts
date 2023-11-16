@@ -1,11 +1,18 @@
 import axios from "axios";
 import bodyParser from "body-parser";
+import cors from "cors";
 import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 
 dotenv.config();
 const app = express();
-app.use(bodyParser.json());
+
+const corsOptions = {
+  origin: "http://localhost:3000",
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions), bodyParser.json());
 const port = 8080;
 
 let parkCodes: string[] = ["anch", "cagr"];
@@ -25,6 +32,38 @@ app.get("/visited-parks", async (req: Request, res: Response) => {
         parkCode: parkCodes ? parkCodes.join(",") : "",
       },
     });
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "An error occurred while trying to fetch external API",
+    });
+  }
+});
+
+app.get("/parks/:stateCode", async (req: Request, res: Response) => {
+  const stateCode = req.params.stateCode;
+  try {
+    let { data } = await axios.get("https://developer.nps.gov/api/v1/parks", {
+      headers: {
+        Accept: "application/json",
+      },
+      params: {
+        api_key: process.env.NP_API_KEY,
+        stateCode,
+      },
+    });
+
+    if (data) {
+      data.data = data.data.map((park: any) => {
+        if (parkCodes.includes(park.parkCode)) {
+          park.visited = true;
+        } else {
+          park.visited = false;
+        }
+        return park;
+      });
+    }
     res.json(data);
   } catch (error) {
     console.error(error);
